@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Report Civic Issue</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    input, textarea, button { display: block; width: 100%; margin: 10px 0; padding: 8px; }
+    img { max-width: 200px; display: block; margin-top: 5px; }
+    #map { width: 100%; height: 300px; margin: 15px 0; border-radius: 8px; }
+    .issue-card { border: 1px solid #ddd; border-radius: 10px; padding: 10px; margin-top: 10px; }
+    .resolved { background-color: #e6ffe6; }
+  </style>
+</head>
+<body>
+  <h1>Report Civic Issue</h1>
+
+  <input id="title" placeholder="Issue Title (e.g., Broken Streetlight)" />
+  <textarea id="description" placeholder="Describe the issue..."></textarea>
+  <input id="location" placeholder="Enter location or click map" />
+  <input type="file" id="photo" accept="image/*" />
+  <button id="submit">Submit Issue</button>
+
+  <div id="map"></div>
+
+  <h2>Your Reported Issues</h2>
+  <div id="my-issues"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyALR6o6lQzX_jR6mctmUWaHqlltUzfKkoc",
+      authDomain: "civics-tracker-demo.firebaseapp.com",
+      projectId: "civics-tracker-demo",
+      storageBucket: "civics-tracker-demo.appspot.com",
+      messagingSenderId: "246778238801",
+      appId: "1:246778238801:web:11e188c8925a307572a570"
+    };
+    firebase.initializeApp(firebaseConfig);
+
+    const db = firebase.firestore();
+    const storage = firebase.storage();
+
+    const title = document.getElementById('title');
+    const description = document.getElementById('description');
+    const locationInput = document.getElementById('location');
+    const photo = document.getElementById('photo');
+    const myIssues = document.getElementById('my-issues');
+    const submit = document.getElementById('submit');
+
+    let selectedCoords = null;
+
+    const map = L.map('map').setView([20.5937, 78.9629], 5);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    map.on('click', e => {
+      selectedCoords = e.latlng;
+      locationInput.value = `Lat: ${e.latlng.lat.toFixed(5)}, Lng: ${e.latlng.lng.toFixed(5)}`;
+    });
+
+    submit.onclick = async () => {
+      const file = photo.files[0];
+      let photoURL = "";
+      if (file) {
+        const ref = storage.ref().child(`issues/${Date.now()}_${file.name}`);
+        await ref.put(file);
+        photoURL = await ref.getDownloadURL();
+      }
+
+      await db.collection('issues').add({
+        title: title.value,
+        description: description.value,
+        locationText: locationInput.value,
+        lat: selectedCoords ? selectedCoords.lat : null,
+        lng: selectedCoords ? selectedCoords.lng : null,
+        photoURL,
+        status: "pending",
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      title.value = description.value = locationInput.value = "";
+      photo.value = "";
+      alert("Issue submitted successfully!");
+    };
+
+    db.collection('issues').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
+      myIssues.innerHTML = "";
+      snapshot.forEach(doc => {
+        const issue = doc.data();
+        const div = document.createElement('div');
+        div.className = "issue-card " + issue.status;
+
+        div.innerHTML = `
+          <h3>${issue.title}</h3>
+          <p>${issue.description}</p>
+          <p><b>Status:</b> ${issue.status === "resolved" ? "✅ Resolved" : "⏳ Pending"}</p>
+          <p><b>Location:</b> ${issue.locationText}</p>
+          ${issue.photoURL ? `<img src="${issue.photoURL}" alt="Issue photo">` : ""}
+          ${issue.resolvedPhotoURL ? `<p><b>After Fix:</b></p><img src="${issue.resolvedPhotoURL}" alt="Resolved photo">` : ""}
+        `;
+        myIssues.appendChild(div);
+      });
+    });
+  </script>
+  <div class="watermarked">
+  <span class="watermark">© Kunal Mistry | Civics Tracker</span>
+</div>
+</body>
+</html>

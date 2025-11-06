@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Dashboard</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    th { background: #f4f4f4; }
+    tr.pending { background-color: #ffe6e6; }
+    tr.resolved { background-color: #e6ffe6; }
+    img { max-width: 80px; border-radius: 8px; }
+    #map { width: 100%; height: 400px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h1>Municipal Admin Dashboard</h1>
+  <p>Click once to enable sound notifications.</p>
+
+  <audio id="tung-sound" src="sounds/PING_DING.mp3" preload="auto"></audio>
+
+  <table>
+    <thead>
+      <tr><th>Title</th><th>Description</th><th>Photo</th><th>Status</th><th>Action</th></tr>
+    </thead>
+    <tbody id="issues-list"></tbody>
+  </table>
+
+  <div id="map"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyALR6o6lQzX_jR6mctmUWaHqlltUzfKkoc",
+      authDomain: "civics-tracker-demo.firebaseapp.com",
+      projectId: "civics-tracker-demo",
+      storageBucket: "civics-tracker-demo.appspot.com",
+      messagingSenderId: "246778238801",
+      appId: "1:246778238801:web:11e188c8925a307572a570"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const storage = firebase.storage();
+    const sound = document.getElementById('tung-sound');
+    let knownIds = new Set();
+    let soundUnlocked = false;
+
+    document.body.addEventListener('click', () => {
+      if(!soundUnlocked) {
+        sound.play().then(() => {
+          sound.pause();
+          sound.currentTime = 0;
+          soundUnlocked = true;
+        }).catch(() => {});
+      }
+    }, { once: true });
+
+    const map = L.map('map').setView([20.5937, 78.9629], 5);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    const list = document.getElementById('issues-list');
+    let markers = [];
+
+    db.collection('issues').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
+      list.innerHTML = "";
+      markers.forEach(m => map.removeLayer(m));
+      markers = [];
+
+      snapshot.forEach(doc => {
+        const issue = doc.data();
+        const tr = document.createElement('tr');
+        tr.className = issue.status;
+
+        if(!knownIds.has(doc.id) && soundUnlocked) {
+          sound.play().catch(() => {});
+          knownIds.add(doc.id);
+        }
+
+        tr.innerHTML = `
+          <td>${issue.title}</td>
+          <td>${issue.description}</td>
+          <td>${issue.photoURL ? `<img src="${issue.photoURL}">` : 'No Photo'}</td>
+          <td>${issue.status}</td>
+          <td>
+            ${issue.status === 'pending'
+              ? `<button onclick="resolveIssue('${doc.id}')">Mark Resolved</button><br>
+                 <input type='file' id='file-${doc.id}' accept='image/*'/>`
+              : '—'}
+          </td>
+        `;
+
+        list.appendChild(tr);
+
+        if(issue.lat && issue.lng) {
+          const marker = L.marker([issue.lat, issue.lng]).addTo(map);
+          let popup = `<b>${issue.title}</b><br>${issue.description}<br>Status: ${issue.status}`;
+          if(issue.photoURL) popup += `<br><img src='${issue.photoURL}' width='100'>`;
+          marker.bindPopup(popup);
+          markers.push(marker);
+        }
+      });
+    });
+
+    async function resolveIssue(id) {
+      const fileInput = document.getElementById(`file-${id}`);
+      let resolvedPhotoURL = "";
+      if (fileInput && fileInput.files[0]) {
+        const file = fileInput.files[0];
+        const ref = storage.ref().child(`resolved/${Date.now()}_${file.name}`);
+        await ref.put(file);
+        resolvedPhotoURL = await ref.getDownloadURL();
+      }
+      await db.collection('issues').doc(id).update({
+        status: "resolved",
+        resolvedPhotoURL
+      });
+    }
+  </script>
+  <div class="watermarked">
+  <img src="${civics-tracker-web/Untitled design-25.png}" alt="Issue photo">
+  <span class="watermark">© Kunal Mistry | Civics Tracker</span>
+</div>
+
+</style>
+
+</body>
+</html>

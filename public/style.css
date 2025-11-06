@@ -1,0 +1,283 @@
+/* ===== Global Reset ===== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Poppins', sans-serif;
+}
+
+body {
+  background: #f4f6f8;
+  color: #333;
+  line-height: 1.6;
+  padding: 20px;
+}
+
+/* ===== Header ===== */
+h1 {
+  font-size: 2rem;
+  color: #1e3a8a;
+  margin-bottom: 0.5rem;
+}
+
+p {
+  font-size: 1rem;
+  color: #555;
+}
+
+/* ===== Table Styling ===== */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+th, td {
+  padding: 12px 15px;
+  text-align: left;
+}
+
+th {
+  background-color: #1e3a8a;
+  color: #fff;
+  font-weight: 600;
+}
+
+td {
+  border-top: 1px solid #e0e0e0;
+}
+
+tr.pending {
+  background-color: #fff5f5;
+}
+
+tr.resolved {
+  background-color: #f0fff4;
+}
+
+/* ===== Buttons ===== */
+button {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
+
+button:hover {
+  opacity: 0.85;
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+/* Mark Resolved Button */
+button.resolve-btn {
+  background-color: #22c55e;
+  color: white;
+}
+
+/* ===== File Input ===== */
+input[type="file"] {
+  margin-top: 5px;
+  display: block;
+}
+
+/* ===== Images ===== */
+img {
+  max-width: 100px;
+  border-radius: 8px;
+  display: block;
+  margin-top: 5px;
+}
+
+/* ===== Map ===== */
+#map {
+  width: 100%;
+  height: 400px;
+  margin-top: 20px;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+/* ===== Watermark ===== */
+.watermarked {
+  position: relative;
+  display: inline-block;
+  margin-top: 20px;
+}
+
+.watermarked img {
+  display: block;
+  max-width: 200px;
+}
+
+.watermarked .watermark {
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  font-size: 0.7rem;
+  color: rgba(255,255,255,0.8);
+  background-color: rgba(0,0,0,0.3);
+  padding: 2px 5px;
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+/* ===== Table Responsive ===== */
+@media (max-width: 768px) {
+  table, thead, tbody, th, td, tr {
+    display: block;
+  }
+
+  th {
+    display: none;
+  }
+
+  td {
+    padding: 10px;
+    border: none;
+    position: relative;
+  }
+
+  td::before {
+    content: attr(data-label);
+    font-weight: bold;
+    display: block;
+    margin-bottom: 5px;
+  }
+}
+/* ===== Global Reset ===== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Poppins', sans-serif;
+}
+
+body {
+  background: #f4f6f8;
+  color: #333;
+  line-height: 1.6;
+  padding: 20px;
+}
+
+/* ===== Headings ===== */
+h1 {
+  font-size: 2rem;
+  color: #1e3a8a;
+  margin-bottom: 10px;
+}
+
+h2 {
+  font-size: 1.5rem;
+  color: #1e3a8a;
+  margin-top: 30px;
+  margin-bottom: 10px;
+}
+
+/* ===== Inputs & Textarea ===== */
+input[type="text"], input[type="file"], textarea {
+  width: 100%;
+  padding: 10px;
+  margin: 5px 0 15px 0;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 1rem;
+  outline: none;
+}
+
+input[type="text"]:focus, textarea:focus {
+  border-color: #1e3a8a;
+}
+
+/* ===== Buttons ===== */
+button {
+  background-color: #1e3a8a;
+  color: #fff;
+  padding: 10px 15px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.3s ease;
+}
+
+button:hover {
+  background-color: #163066;
+}
+
+/* ===== Map Styling ===== */
+#map {
+  width: 100%;
+  height: 300px;
+  margin-bottom: 20px;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+/* ===== Issue Cards ===== */
+.issue-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 15px;
+  margin-bottom: 15px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+.issue-card h3 {
+  color: #1e3a8a;
+  margin-bottom: 5px;
+}
+
+.issue-card p {
+  margin-bottom: 5px;
+}
+
+.issue-card img {
+  max-width: 100%;
+  border-radius: 8px;
+  margin-top: 5px;
+}
+
+.issue-card.pending {
+  border-left: 5px solid #f59e0b;
+}
+
+.issue-card.resolved {
+  border-left: 5px solid #22c55e;
+}
+
+/* ===== Watermark ===== */
+.watermarked {
+  position: relative;
+  margin-top: 20px;
+}
+
+.watermarked .watermark {
+  display: inline-block;
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.8);
+  background-color: rgba(0,0,0,0.3);
+  padding: 3px 6px;
+  border-radius: 4px;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 768px) {
+  #map {
+    height: 250px;
+  }
+
+  button {
+    width: 100%;
+  }
+}
