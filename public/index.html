@@ -1,16 +1,119 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Report Civic Issue</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    input, textarea, button { display: block; width: 100%; margin: 10px 0; padding: 8px; }
-    img { max-width: 200px; display: block; margin-top: 5px; }
-    #map { width: 100%; height: 300px; margin: 15px 0; border-radius: 8px; }
-    .issue-card { border: 1px solid #ddd; border-radius: 10px; padding: 10px; margin-top: 10px; }
-    .resolved { background-color: #e6ffe6; }
+    :root {
+      --primary: #0066cc;
+      --bg-light: #f9f9f9;
+      --border-color: #ddd;
+    }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 0;
+      padding: 15px;
+      background-color: var(--bg-light);
+    }
+
+    h1, h2 {
+      text-align: center;
+      color: #333;
+    }
+
+    input, textarea, button {
+      width: 100%;
+      margin: 8px 0;
+      padding: 12px;
+      font-size: 16px;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      box-sizing: border-box;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    button {
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background-color: #004c99;
+    }
+
+    #map {
+      width: 100%;
+      height: 300px;
+      margin: 15px 0;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+    }
+
+    .issue-card {
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 12px;
+      margin-top: 12px;
+      background-color: white;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+
+    .issue-card.resolved {
+      background-color: #e6ffe6;
+    }
+
+    .issue-card h3 {
+      margin-top: 0;
+      color: #222;
+    }
+
+    .issue-card img {
+      max-width: 100%;
+      border-radius: 8px;
+      margin-top: 8px;
+    }
+
+    .watermarked {
+      text-align: center;
+      margin-top: 25px;
+      font-size: 13px;
+      color: #666;
+    }
+
+    /* Mobile optimizations */
+    @media (max-width: 600px) {
+      body {
+        padding: 10px;
+      }
+
+      h1 {
+        font-size: 1.5rem;
+      }
+
+      button {
+        font-size: 15px;
+        padding: 10px;
+      }
+
+      #map {
+        height: 250px;
+      }
+
+      .issue-card {
+        padding: 10px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -87,7 +190,7 @@
 
       title.value = description.value = locationInput.value = "";
       photo.value = "";
-      alert("Issue submitted successfully!");
+      alert("✅ Issue submitted successfully!");
     };
 
     db.collection('issues').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
@@ -95,7 +198,7 @@
       snapshot.forEach(doc => {
         const issue = doc.data();
         const div = document.createElement('div');
-        div.className = "issue-card " + issue.status;
+        div.className = "issue-card " + (issue.status === "resolved" ? "resolved" : "");
 
         div.innerHTML = `
           <h3>${issue.title}</h3>
@@ -109,8 +212,9 @@
       });
     });
   </script>
+
   <div class="watermarked">
-  <span class="watermark">© Kunal Mistry | Civics Tracker</span>
-</div>
+    © Kunal Mistry | Civics Tracker
+  </div>
 </body>
 </html>
