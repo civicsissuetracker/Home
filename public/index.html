@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Civic Issue Reporter | Civics Tracker</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
   <style>
     :root {
@@ -20,7 +20,7 @@
       font-family: 'Poppins', sans-serif;
       margin: 0;
       padding: 15px;
-      background-color: var(--bg-light);
+      background: var(--bg-light);
       color: var(--text-dark);
     }
 
@@ -39,24 +39,23 @@
       box-sizing: border-box;
     }
 
-    textarea {
-      resize: vertical;
-      min-height: 80px;
-    }
+    textarea { resize: vertical; min-height: 80px; }
 
     button {
       background-color: var(--primary);
-      color: white;
       border: none;
+      color: white;
       font-weight: bold;
       cursor: pointer;
-      transition: background 0.2s;
+      transition: 0.2s;
     }
+    button:hover { background-color: #3da300; }
 
-    button:hover {
-      background-color: #399a00;
+    /* MAP HIDDEN INITIALLY */
+    #map-container {
+      display: none;
+      transition: all 0.3s ease;
     }
-
     #map {
       width: 100%;
       height: 300px;
@@ -65,16 +64,12 @@
       border: 1px solid var(--border-color);
     }
 
-    #filter {
-      margin-top: 20px;
-    }
-
     .issue-card {
+      background: white;
       border: 1px solid var(--border-color);
       border-radius: 12px;
       padding: 12px;
       margin-top: 12px;
-      background-color: white;
       box-shadow: 0 2px 6px rgba(0,0,0,0.05);
     }
 
@@ -82,63 +77,61 @@
     .issue-card.resolved { border-left: 5px solid var(--primary); }
     .issue-card.flagged { border-left: 5px solid var(--danger); }
 
-    .issue-card h3 {
-      margin-top: 0;
-      color: #222;
-    }
-
     .issue-card img {
-      max-width: 100%;
+      width: 100%;
       border-radius: 8px;
       margin-top: 8px;
     }
 
     .watermarked {
       text-align: center;
-      margin-top: 25px;
+      margin-top: 20px;
       font-size: 13px;
-      color: #666;
+      color: #777;
     }
 
-    /* Mobile-friendly adjustments */
     @media (max-width: 600px) {
-      body { padding: 10px; }
+      #map { height: 250px; }
       h1 { font-size: 1.6rem; }
       h2 { font-size: 1.3rem; }
-      button { font-size: 15px; padding: 10px; }
-      #map { height: 250px; }
-      .issue-card { padding: 10px; }
     }
   </style>
 </head>
 
 <body>
+
   <h1>📢 Report Civic Issue</h1>
 
   <!-- Category -->
   <select id="category">
     <option value="Road">🛣️ Road</option>
-    <option value="Water">💧 Water</option>
+    <option value="Water">💧 Water Leakage</option>
     <option value="Streetlight">💡 Streetlight</option>
-    <option value="Waste">🗑️ Waste</option>
+    <option value="Waste">🗑️ Waste / Garbage</option>
     <option value="Other">🔧 Other</option>
   </select>
 
-  <!-- Input Fields -->
-  <input id="title" placeholder="Issue Title (e.g., Broken Streetlight)" />
+  <input id="title" placeholder="Issue Title (e.g., Broken Streetlight)">
   <textarea id="description" placeholder="Describe the issue..."></textarea>
-  <input id="location" placeholder="Enter location or click on map" />
-  <div id="map"></div>
-  <input type="file" id="photo" accept="image/*" />
+  <input id="location" placeholder="Click here to choose location on map">
+
+  <!-- Map Hidden Initially -->
+  <div id="map-container">
+    <div id="map"></div>
+  </div>
+
+  <input type="file" id="photo" accept="image/*">
   <button id="submit">📨 Submit Issue</button>
 
   <h2>📋 Reported Issues</h2>
+
   <select id="filter">
     <option value="all">All</option>
     <option value="pending">Pending</option>
     <option value="resolved">Resolved</option>
     <option value="flagged">Flagged</option>
   </select>
+
   <div id="my-issues"></div>
 
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -147,7 +140,6 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <script>
-    // --- Firebase Configuration ---
     const firebaseConfig = {
       apiKey: "AIzaSyALR6o6lQzX_jR6mctmUWaHqlltUzfKkoc",
       authDomain: "civics-tracker-demo.firebaseapp.com",
@@ -157,58 +149,77 @@
       appId: "1:246778238801:web:11e188c8925a307572a570"
     };
     firebase.initializeApp(firebaseConfig);
+
     const db = firebase.firestore();
     const storage = firebase.storage();
 
-    // --- Form Inputs ---
     const category = document.getElementById('category');
     const title = document.getElementById('title');
     const description = document.getElementById('description');
     const locationInput = document.getElementById('location');
     const photo = document.getElementById('photo');
-    const myIssues = document.getElementById('my-issues');
-    const submit = document.getElementById('submit');
-    const filter = document.getElementById('filter');
+    const filter = document.getElementById("filter");
+    const myIssues = document.getElementById("my-issues");
 
+    const mapContainer = document.getElementById("map-container");
+    let mapInitialized = false;
+    let map;
+    let marker;
     let selectedCoords = null;
 
-    // --- Map Initialization ---
-    const map = L.map('map').setView([20.5937, 78.9629], 5);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '© OpenStreetMap contributors'
-}).addTo(map);
-
-// --- Add a marker when user clicks ---
-let marker; // will hold the user's selected marker
-
-map.on('click', e => {
-  selectedCoords = e.latlng;
-  locationInput.value = `Lat: ${e.latlng.lat.toFixed(5)}, Lng: ${e.latlng.lng.toFixed(5)}`;
-
-  // If marker already exists, move it; else create new one
-  if (marker) {
-    marker.setLatLng(e.latlng);
-  } else {
-    marker = L.marker(e.latlng, { draggable: true }).addTo(map);
-    marker.bindPopup("📍 Your selected location").openPopup();
-
-    // Allow dragging to fine-tune position
-    marker.on('dragend', function(event) {
-      const position = event.target.getLatLng();
-      selectedCoords = position;
-      locationInput.value = `Lat: ${position.lat.toFixed(5)}, Lng: ${position.lng.toFixed(5)}`;
+    // Show map when clicking location box
+    locationInput.addEventListener("focus", () => {
+      mapContainer.style.display = "block";
+      initializeMap();
     });
-  }
-});
 
-    // --- Submit Issue ---
+    // Initialize map only once
+    function initializeMap() {
+      if (mapInitialized) return;
+      mapInitialized = true;
+
+      map = L.map('map').setView([20.5937, 78.9629], 5);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(map);
+
+      // Red marker icon
+      const redIcon = new L.Icon({
+        iconUrl: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
+        iconSize: [32, 32],
+        iconAnchor: [16, 32],
+        popupAnchor: [0, -32]
+      });
+
+      map.on('click', e => {
+        selectedCoords = e.latlng;
+        locationInput.value = `Lat: ${e.latlng.lat.toFixed(5)}, Lng: ${e.latlng.lng.toFixed(5)}`;
+
+        if (marker) marker.setLatLng(e.latlng);
+        else {
+          marker = L.marker(e.latlng, { icon: redIcon, draggable: true }).addTo(map);
+        }
+
+        // Update location when user drags marker
+        marker.on('dragend', function(ev) {
+          const pos = ev.target.getLatLng();
+          selectedCoords = pos;
+          locationInput.value = `Lat: ${pos.lat.toFixed(5)}, Lng: ${pos.lng.toFixed(5)}`;
+        });
+
+        // Auto-hide map after selecting
+        setTimeout(() => mapContainer.style.display = "none", 700);
+      });
+    }
+
+    // Submit issue
     submit.onclick = async () => {
       const file = photo.files[0];
       const titleText = title.value.trim();
       const descText = description.value.trim();
 
       if (!titleText || !descText) {
-        alert("⚠️ Please fill in all fields.");
+        alert("⚠️ Please fill all fields.");
         return;
       }
 
@@ -219,9 +230,10 @@ map.on('click', e => {
         photoURL = await ref.getDownloadURL();
       }
 
-      // --- Fake detection ---
+      // Fake detection
       const fakeWords = ["test", "asdf", "fake", "none", "demo", "123", "hello"];
       let status = "pending";
+
       if (
         fakeWords.some(w => titleText.toLowerCase().includes(w)) ||
         fakeWords.some(w => descText.toLowerCase().includes(w)) ||
@@ -230,11 +242,11 @@ map.on('click', e => {
         status = "flagged";
       }
 
-      await db.collection('issues').add({
+      await db.collection("issues").add({
         title: titleText,
         description: descText,
         category: category.value,
-        locationText: locationInput.value || "No location provided",
+        locationText: locationInput.value,
         lat: selectedCoords ? selectedCoords.lat : null,
         lng: selectedCoords ? selectedCoords.lng : null,
         photoURL,
@@ -244,32 +256,35 @@ map.on('click', e => {
 
       title.value = description.value = locationInput.value = "";
       photo.value = "";
-      alert(`✅ Issue submitted successfully! Status: ${status.toUpperCase()}`);
+      alert("✅ Issue Submitted!");
     };
 
-    // --- Render Issues with Filter ---
+    // Display user's issues
     function renderIssues(filterType = "all") {
-      db.collection('issues').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
+      db.collection("issues").orderBy("createdAt", "desc").onSnapshot(snapshot => {
         myIssues.innerHTML = "";
         snapshot.forEach(doc => {
           const issue = doc.data();
+
           if (filterType !== "all" && issue.status !== filterType) return;
 
-          const div = document.createElement('div');
+          const div = document.createElement("div");
           div.className = "issue-card " + issue.status;
+
           div.innerHTML = `
             <h3>${issue.title}</h3>
-            <p><b>Category:</b> ${issue.category || "General"}</p>
+            <p><b>Category:</b> ${issue.category}</p>
             <p>${issue.description}</p>
             <p><b>Status:</b> ${
               issue.status === "resolved" ? "✅ Resolved" :
-              issue.status === "flagged" ? "⚠️ Flagged for Review" :
+              issue.status === "flagged" ? "⚠️ Flagged" :
               "⏳ Pending"
             }</p>
             <p><b>Location:</b> ${issue.locationText}</p>
-            ${issue.photoURL ? `<img src="${issue.photoURL}" alt="Issue photo">` : ""}
-            ${issue.resolvedPhotoURL ? `<p><b>After Fix:</b></p><img src="${issue.resolvedPhotoURL}" alt="Resolved photo">` : ""}
+            ${issue.photoURL ? `<img src="${issue.photoURL}">` : ""}
+            ${issue.resolvedPhotoURL ? `<p><b>After Fix:</b></p><img src="${issue.resolvedPhotoURL}">` : ""}
           `;
+
           myIssues.appendChild(div);
         });
       });
@@ -279,8 +294,6 @@ map.on('click', e => {
     renderIssues();
   </script>
 
-  <div class="watermarked">
-    © 2025 Civics Tracker | Made by Kunal Mistry
-  </div>
+  <div class="watermarked">© 2025 Civics Tracker | Made by Kunal Mistry</div>
 </body>
 </html>
