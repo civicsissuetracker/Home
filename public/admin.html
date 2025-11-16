@@ -74,10 +74,15 @@
       border-radius: 8px;
     }
 
+    /* Map container hidden initially */
+    #map-container {
+      display: none;
+      margin-top: 20px;
+    }
+
     #map {
       width: 100%;
       height: 400px;
-      margin-top: 25px;
       border-radius: 12px;
       border: 1px solid #cbd5e1;
     }
@@ -92,7 +97,7 @@
 </head>
 <body>
   <h1>🏛️ Municipal Admin Dashboard</h1>
-  <p>Monitor civic issues in real-time and prioritize effectively.</p>
+  <p>Click any issue to view its location.</p>
 
   <div class="top-bar">
     <p>Click once to enable sound notifications.</p>
@@ -120,7 +125,11 @@
     <tbody id="issues-list"></tbody>
   </table>
 
-  <div id="map"></div>
+  <!-- MAP THAT IS HIDDEN UNTIL CLICKED -->
+  <div id="map-container">
+    <h2>📍 Issue Location</h2>
+    <div id="map"></div>
+  </div>
 
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -141,12 +150,16 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
     const storage = firebase.storage();
-    const sound = document.getElementById('tung-sound');
+
+    const sortSelect = document.getElementById("sort-options");
+    const list = document.getElementById("issues-list");
+
     let knownIds = new Set();
     let soundUnlocked = false;
+    const sound = document.getElementById("tung-sound");
 
     document.body.addEventListener('click', () => {
-      if(!soundUnlocked) {
+      if (!soundUnlocked) {
         sound.play().then(() => {
           sound.pause();
           sound.currentTime = 0;
@@ -155,16 +168,22 @@
       }
     }, { once: true });
 
-    // --- Map Setup ---
-    const map = L.map('map').setView([20.5937, 78.9629], 5);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
+    // --- Map Setup (but hidden) ---
+    const mapContainer = document.getElementById("map-container");
+    let map;
+    let mapInitialized = false;
+    let pointer;
 
-    const list = document.getElementById('issues-list');
-    let markers = [];
+    function initMap() {
+      if (mapInitialized) return;
+      mapInitialized = true;
 
-    const sortSelect = document.getElementById("sort-options");
+      map = L.map('map').setView([20.5937, 78.9629], 5);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(map);
+    }
+
     sortSelect.addEventListener("change", () => loadIssues(sortSelect.value));
 
     // --- Main Loader ---
@@ -178,73 +197,76 @@
 
       query.onSnapshot(snapshot => {
         list.innerHTML = "";
-        markers.forEach(m => map.removeLayer(m));
-        markers = [];
 
         snapshot.forEach(doc => {
           const issue = doc.data();
           const tr = document.createElement('tr');
-          tr.classList.add(issue.status);
 
-          // --- Priority Detection ---
+          // Priority detection  
           let priority = "Normal";
           const text = (issue.title + " " + issue.description).toLowerCase();
-          if (text.includes("accident") || text.includes("fire") || text.includes("collapse") || text.includes("danger")) {
+          if (text.includes("accident") || text.includes("fire") || text.includes("danger"))
             priority = "High";
-            tr.classList.add("high");
-          } else {
-            tr.classList.add("normal");
-          }
 
-          // --- New Sound Notification ---
-          if (!knownIds.has(doc.id) && soundUnlocked) {
-            sound.play().catch(() => {});
-            knownIds.add(doc.id);
-          }
+          tr.classList.add(issue.status);
+          tr.classList.add(priority === "High" ? "high" : "normal");
 
           tr.innerHTML = `
             <td><b>${priority}</b></td>
             <td>${issue.title}</td>
             <td>${issue.description}</td>
-            <td>${issue.photoURL ? `<img src="${issue.photoURL}">` : 'No Photo'}</td>
+            <td>${issue.photoURL ? `<img src="${issue.photoURL}">` : "No photo"}</td>
             <td>${issue.status}</td>
             <td>
-              ${issue.status === 'pending'
-                ? `<button onclick="resolveIssue('${doc.id}')">Mark Resolved</button><br>
-                   <input type='file' id='file-${doc.id}' accept='image/*'/>`
-                : '—'}
+              ${issue.status === "pending" ?
+                `<button onclick="resolveIssue('${doc.id}')">Resolve</button>
+                 <br><input type="file" id="file-${doc.id}">`
+                 : "—"}
             </td>
           `;
-          list.appendChild(tr);
 
-          if (issue.lat && issue.lng) {
-            const marker = L.marker([issue.lat, issue.lng]).addTo(map);
-            let popup = `<b>${issue.title}</b><br>${issue.description}<br>Status: ${issue.status}`;
-            if (issue.photoURL) popup += `<br><img src='${issue.photoURL}' width='100'>`;
-            marker.bindPopup(popup);
-            markers.push(marker);
-          }
+          // CLICK ROW → SHOW MAP + JUMP TO LOCATION
+          tr.onclick = () => {
+            if (!issue.lat || !issue.lng) {
+              alert("No location for this issue.");
+              return;
+            }
+
+            mapContainer.style.display = "block";
+            initMap();
+
+            map.setView([issue.lat, issue.lng], 16);
+
+            if (pointer) {
+              pointer.setLatLng([issue.lat, issue.lng]);
+            } else {
+              pointer = L.marker([issue.lat, issue.lng]).addTo(map);
+            }
+          };
+
+          list.appendChild(tr);
         });
       });
     }
 
-    // --- Resolve Function ---
+    // Resolve function
     async function resolveIssue(id) {
       const fileInput = document.getElementById(`file-${id}`);
       let resolvedPhotoURL = "";
+
       if (fileInput && fileInput.files[0]) {
         const file = fileInput.files[0];
         const ref = storage.ref().child(`resolved/${Date.now()}_${file.name}`);
         await ref.put(file);
         resolvedPhotoURL = await ref.getDownloadURL();
       }
-      await db.collection('issues').doc(id).update({
+
+      await db.collection("issues").doc(id).update({
         status: "resolved",
         resolvedPhotoURL
       });
     }
 
-    // Load default issues
     loadIssues();
   </script>
 
