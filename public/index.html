@@ -1,30 +1,36 @@
 <!DOCTYPE html>
 <html lang="en">
+>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Report Civic Issue</title>
+  <title>Civic Issue Reporter | Civics Tracker</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
   <style>
     :root {
-      --primary: #0066cc;
+      --primary: #4ecc00;
+      --danger: #ff4d4d;
+      --pending: #ffd500;
       --bg-light: #f9f9f9;
       --border-color: #ddd;
+      --text-dark: #333;
     }
 
     body {
-      font-family: 'Segoe UI', Arial, sans-serif;
+      font-family: 'Poppins', sans-serif;
       margin: 0;
       padding: 15px;
       background-color: var(--bg-light);
+      color: var(--text-dark);
     }
 
     h1, h2 {
       text-align: center;
-      color: #333;
+      color: #1e3a8a;
     }
 
-    input, textarea, button {
+    input, textarea, select, button {
       width: 100%;
       margin: 8px 0;
       padding: 12px;
@@ -49,15 +55,19 @@
     }
 
     button:hover {
-      background-color: #004c99;
+      background-color: #399a00;
     }
 
     #map {
       width: 100%;
       height: 300px;
-      margin: 15px 0;
+      margin: 10px 0;
       border-radius: 10px;
       border: 1px solid var(--border-color);
+    }
+
+    #filter {
+      margin-top: 20px;
     }
 
     .issue-card {
@@ -66,12 +76,12 @@
       padding: 12px;
       margin-top: 12px;
       background-color: white;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
     }
 
-    .issue-card.resolved {
-      background-color: #e6ffe6;
-    }
+    .issue-card.pending { border-left: 5px solid var(--pending); }
+    .issue-card.resolved { border-left: 5px solid var(--primary); }
+    .issue-card.flagged { border-left: 5px solid var(--danger); }
 
     .issue-card h3 {
       margin-top: 0;
@@ -91,44 +101,45 @@
       color: #666;
     }
 
-    /* Mobile optimizations */
+    /* Mobile-friendly adjustments */
     @media (max-width: 600px) {
-      body {
-        padding: 10px;
-      }
-
-      h1 {
-        font-size: 1.5rem;
-      }
-
-      button {
-        font-size: 15px;
-        padding: 10px;
-      }
-
-      #map {
-        height: 250px;
-      }
-
-      .issue-card {
-        padding: 10px;
-      }
+      body { padding: 10px; }
+      h1 { font-size: 1.6rem; }
+      h2 { font-size: 1.3rem; }
+      button { font-size: 15px; padding: 10px; }
+      #map { height: 250px; }
+      .issue-card { padding: 10px; }
     }
   </style>
 </head>
-<body>
-  <h1>Report Civic Issue</h1>
 
+<body>
+  <h1>📢 Report Civic Issue</h1>
+
+  <!-- Category -->
+  <select id="category">
+    <option value="Road">🛣️ Road</option>
+    <option value="Water">💧 Water</option>
+    <option value="Streetlight">💡 Streetlight</option>
+    <option value="Waste">🗑️ Waste</option>
+    <option value="Other">🔧 Other</option>
+  </select>
+
+  <!-- Input Fields -->
   <input id="title" placeholder="Issue Title (e.g., Broken Streetlight)" />
   <textarea id="description" placeholder="Describe the issue..."></textarea>
-  <input id="location" placeholder="Enter location or click map" />
+  <input id="location" placeholder="Enter location or click on map" />
   <div id="map"></div>
   <input type="file" id="photo" accept="image/*" />
-  <button id="submit">Submit Issue</button>
+  <button id="submit">📨 Submit Issue</button>
 
-  
-
-  <h2>Your Reported Issues</h2>
+  <h2>📋 Reported Issues</h2>
+  <select id="filter">
+    <option value="all">All</option>
+    <option value="pending">Pending</option>
+    <option value="resolved">Resolved</option>
+    <option value="flagged">Flagged</option>
+  </select>
   <div id="my-issues"></div>
 
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -137,6 +148,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <script>
+    // --- Firebase Configuration ---
     const firebaseConfig = {
       apiKey: "AIzaSyALR6o6lQzX_jR6mctmUWaHqlltUzfKkoc",
       authDomain: "civics-tracker-demo.firebaseapp.com",
@@ -146,31 +158,61 @@
       appId: "1:246778238801:web:11e188c8925a307572a570"
     };
     firebase.initializeApp(firebaseConfig);
-
     const db = firebase.firestore();
     const storage = firebase.storage();
 
+    // --- Form Inputs ---
+    const category = document.getElementById('category');
     const title = document.getElementById('title');
     const description = document.getElementById('description');
     const locationInput = document.getElementById('location');
     const photo = document.getElementById('photo');
     const myIssues = document.getElementById('my-issues');
     const submit = document.getElementById('submit');
+    const filter = document.getElementById('filter');
 
     let selectedCoords = null;
 
+    // --- Map Initialization ---
     const map = L.map('map').setView([20.5937, 78.9629], 5);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap contributors'
+}).addTo(map);
 
-    map.on('click', e => {
-      selectedCoords = e.latlng;
-      locationInput.value = `Lat: ${e.latlng.lat.toFixed(5)}, Lng: ${e.latlng.lng.toFixed(5)}`;
+// --- Add a marker when user clicks ---
+let marker; // will hold the user's selected marker
+
+map.on('click', e => {
+  selectedCoords = e.latlng;
+  locationInput.value = `Lat: ${e.latlng.lat.toFixed(5)}, Lng: ${e.latlng.lng.toFixed(5)}`;
+
+  // If marker already exists, move it; else create new one
+  if (marker) {
+    marker.setLatLng(e.latlng);
+  } else {
+    marker = L.marker(e.latlng, { draggable: true }).addTo(map);
+    marker.bindPopup("📍 Your selected location").openPopup();
+
+    // Allow dragging to fine-tune position
+    marker.on('dragend', function(event) {
+      const position = event.target.getLatLng();
+      selectedCoords = position;
+      locationInput.value = `Lat: ${position.lat.toFixed(5)}, Lng: ${position.lng.toFixed(5)}`;
     });
+  }
+});
 
+    // --- Submit Issue ---
     submit.onclick = async () => {
       const file = photo.files[0];
+      const titleText = title.value.trim();
+      const descText = description.value.trim();
+
+      if (!titleText || !descText) {
+        alert("⚠️ Please fill in all fields.");
+        return;
+      }
+
       let photoURL = "";
       if (file) {
         const ref = storage.ref().child(`issues/${Date.now()}_${file.name}`);
@@ -178,44 +220,68 @@
         photoURL = await ref.getDownloadURL();
       }
 
+      // --- Fake detection ---
+      const fakeWords = ["test", "asdf", "fake", "none", "demo", "123", "hello"];
+      let status = "pending";
+      if (
+        fakeWords.some(w => titleText.toLowerCase().includes(w)) ||
+        fakeWords.some(w => descText.toLowerCase().includes(w)) ||
+        (!photoURL && !locationInput.value)
+      ) {
+        status = "flagged";
+      }
+
       await db.collection('issues').add({
-        title: title.value,
-        description: description.value,
-        locationText: locationInput.value,
+        title: titleText,
+        description: descText,
+        category: category.value,
+        locationText: locationInput.value || "No location provided",
         lat: selectedCoords ? selectedCoords.lat : null,
         lng: selectedCoords ? selectedCoords.lng : null,
         photoURL,
-        status: "pending",
+        status,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
 
       title.value = description.value = locationInput.value = "";
       photo.value = "";
-      alert("✅ Issue submitted successfully!");
+      alert(`✅ Issue submitted successfully! Status: ${status.toUpperCase()}`);
     };
 
-    db.collection('issues').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
-      myIssues.innerHTML = "";
-      snapshot.forEach(doc => {
-        const issue = doc.data();
-        const div = document.createElement('div');
-        div.className = "issue-card " + (issue.status === "resolved" ? "resolved" : "");
+    // --- Render Issues with Filter ---
+    function renderIssues(filterType = "all") {
+      db.collection('issues').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
+        myIssues.innerHTML = "";
+        snapshot.forEach(doc => {
+          const issue = doc.data();
+          if (filterType !== "all" && issue.status !== filterType) return;
 
-        div.innerHTML = `
-          <h3>${issue.title}</h3>
-          <p>${issue.description}</p>
-          <p><b>Status:</b> ${issue.status === "resolved" ? "✅ Resolved" : "⏳ Pending"}</p>
-          <p><b>Location:</b> ${issue.locationText}</p>
-          ${issue.photoURL ? `<img src="${issue.photoURL}" alt="Issue photo">` : ""}
-          ${issue.resolvedPhotoURL ? `<p><b>After Fix:</b></p><img src="${issue.resolvedPhotoURL}" alt="Resolved photo">` : ""}
-        `;
-        myIssues.appendChild(div);
+          const div = document.createElement('div');
+          div.className = "issue-card " + issue.status;
+          div.innerHTML = `
+            <h3>${issue.title}</h3>
+            <p><b>Category:</b> ${issue.category || "General"}</p>
+            <p>${issue.description}</p>
+            <p><b>Status:</b> ${
+              issue.status === "resolved" ? "✅ Resolved" :
+              issue.status === "flagged" ? "⚠️ Flagged for Review" :
+              "⏳ Pending"
+            }</p>
+            <p><b>Location:</b> ${issue.locationText}</p>
+            ${issue.photoURL ? `<img src="${issue.photoURL}" alt="Issue photo">` : ""}
+            ${issue.resolvedPhotoURL ? `<p><b>After Fix:</b></p><img src="${issue.resolvedPhotoURL}" alt="Resolved photo">` : ""}
+          `;
+          myIssues.appendChild(div);
+        });
       });
-    });
+    }
+
+    filter.addEventListener("change", () => renderIssues(filter.value));
+    renderIssues();
   </script>
 
   <div class="watermarked">
-    © Kunal Mistry | Civics Tracker
+    © 2025 Civics Tracker | Made by Kunal Mistry
   </div>
 </body>
 </html>
